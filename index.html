@@ -221,6 +221,9 @@
             border-color: var(--accent-c);
         }
 
+        .folder-pill span:hover { color: white; }
+        .folder-delete-icon:hover { color: var(--danger) !important; opacity: 1 !important; transform: scale(1.2); }
+
         /* Modals */
         .modal-overlay {
             position: fixed;
@@ -642,8 +645,15 @@
             const tabs = document.getElementById('folder-tabs');
             
             // Render Folders
-            tabs.innerHTML = `<div class="folder-pill ${activeFolder === 'all' ? 'active' : ''}" onclick="filterByFolder('all')">All Signals</div>` + 
-                folders.map(f => `<div class="folder-pill ${activeFolder === f.id ? 'active' : ''}" onclick="filterByFolder('${f.id}')">${f.name} <span style="opacity: 0.5; font-size: 14px;" onclick="event.stopPropagation(); deleteFolder('${f.id}')">×</span></div>`).join('');
+            tabs.innerHTML = `
+                <div class="folder-pill ${activeFolder === 'all' ? 'active' : ''}" onclick="filterByFolder('all')">All Signals</div>
+                ${folders.map(f => `
+                    <div class="folder-pill ${activeFolder === f.id ? 'active' : ''}" onclick="filterByFolder('${f.id}')">
+                        <span onclick="event.stopPropagation(); renameFolder('${f.id}')" title="Click to rename">${f.name}</span>
+                        ${f.id !== 'default' ? `<span class="folder-delete-icon" style="opacity: 0.5; font-size: 16px; margin-left: 6px; cursor: pointer; padding: 0 4px; transition: 0.2s;" onclick="event.stopPropagation(); deleteFolder('${f.id}')">×</span>` : ''}
+                    </div>
+                `).join('')}
+            `;
 
             // Render Stocks
             const filtered = activeFolder === 'all' ? watchlist : watchlist.filter(w => w.folderId === activeFolder);
@@ -657,7 +667,14 @@
                         <div class="potential-badge ${w.rating >= 9 ? 'high' : ''}">${w.rating}</div>
                     </div>
                     
-                    ${w.notes ? `<div style="font-size: 13px; color: var(--text-s); line-height: 1.6; background: rgba(255,255,255,0.02); padding: 12px; border-radius: 12px; border: 1px solid var(--border);">${w.notes}</div>` : ''}
+                    ${w.notes ? `<div id="notes-${idx}" style="font-size: 13px; color: var(--text-s); line-height: 1.6; background: rgba(255,255,255,0.02); padding: 12px; border-radius: 12px; border: 1px solid var(--border); cursor: pointer;" onclick="enableNoteEdit('${w.ticker}', ${idx})">${w.notes}</div>` : `<div id="notes-${idx}" style="font-size: 13px; color: rgba(255,255,255,0.2); font-style: italic; background: rgba(255,255,255,0.01); padding: 12px; border-radius: 12px; border: 1px dashed var(--border); cursor: pointer;" onclick="enableNoteEdit('${w.ticker}', ${idx})">+ Add personal notes...</div>`}
+
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label style="margin: 0; font-size: 10px;">Move to:</label>
+                        <select style="font-size: 11px; padding: 4px 8px; flex: 1;" onchange="moveStock('${w.ticker}', this.value)">
+                            ${folders.map(f => `<option value="${f.id}" ${f.id === w.folderId ? 'selected' : ''}>${f.name}</option>`).join('')}
+                        </select>
+                    </div>
 
                     <div class="research-section">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
@@ -700,6 +717,52 @@
         function filterByFolder(id) {
             activeFolder = id;
             refreshUI();
+        }
+
+        function renameFolder(id) {
+            if(id === 'default') return;
+            const folder = folders.find(f => f.id === id);
+            const newName = prompt('Modify intelligence folder name:', folder.name);
+            if(newName && newName.trim() !== '') {
+                folder.name = newName.trim();
+                showToast('FOLDER SIGNATURE UPDATED');
+                refreshUI();
+            }
+        }
+
+        function moveStock(ticker, newFolderId) {
+            const stock = watchlist.find(w => w.ticker === ticker);
+            if(stock) {
+                stock.folderId = newFolderId;
+                showToast(`MOVED ${ticker} TO ${folders.find(f => f.id === newFolderId).name}`);
+                refreshUI();
+            }
+        }
+
+        function enableNoteEdit(ticker, idx) {
+            const el = document.getElementById(`notes-${idx}`);
+            const stock = watchlist.find(w => w.ticker === ticker);
+            const currentNotes = stock.notes || '';
+            
+            el.innerHTML = `
+                <textarea id="edit-notes-${idx}" style="min-height: 60px; margin-bottom: 8px;">${currentNotes}</textarea>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn" style="padding: 6px 12px; font-size: 11px;" onclick="saveNoteEdit('${ticker}', ${idx})">Save Note</button>
+                    <button class="btn-outline" style="padding: 6px 12px; font-size: 11px;" onclick="renderWatchlist()">Cancel</button>
+                </div>
+            `;
+            el.onclick = null; // Prevent re-triggering
+            document.getElementById(`edit-notes-${idx}`).focus();
+        }
+
+        function saveNoteEdit(ticker, idx) {
+            const stock = watchlist.find(w => w.ticker === ticker);
+            const newNotes = document.getElementById(`edit-notes-${idx}`).value;
+            if(stock) {
+                stock.notes = newNotes;
+                showToast('PERSONAL NOTES UPDATED');
+                refreshUI();
+            }
         }
 
         function deleteFolder(id) {
