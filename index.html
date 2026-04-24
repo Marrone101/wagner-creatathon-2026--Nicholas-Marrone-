@@ -285,6 +285,57 @@
         .status-gain { background: rgba(16, 185, 129, 0.15); color: var(--success); }
         .status-loss { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
 
+        /* Research Entries Styling */
+        .research-section {
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .research-entry {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 8px;
+            font-size: 12px;
+            position: relative;
+        }
+
+        .research-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 6px;
+            color: var(--text-s);
+        }
+
+        .rating-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+        }
+
+        .rating-red { background-color: var(--danger); box-shadow: 0 0 10px var(--danger); }
+        .rating-yellow { background-color: var(--warning); box-shadow: 0 0 10px var(--warning); }
+        .rating-green { background-color: var(--success); box-shadow: 0 0 10px var(--success); }
+
+        textarea {
+            width: 100%;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            padding: 12px 16px;
+            border-radius: 12px;
+            color: white;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        textarea:focus { border-color: var(--accent-p); outline: none; }
+
         .delete-btn {
             color: var(--text-s); cursor: pointer; transition: 0.2s; font-size: 18px;
         }
@@ -378,22 +429,29 @@
         <!-- Watchlist View -->
         <div id="watchlist-view" class="view-content hidden">
             <div class="folder-bar" id="folder-tabs"></div>
-            <div style="margin-bottom: 24px; display: flex; gap: 20px;">
-                <div class="glass-card" style="flex: 1; padding: 20px;">
-                    <form id="watchlist-form" style="display: flex; gap: 12px; align-items: flex-end;">
-                        <div style="flex: 1;">
-                            <label>Stock Ticker</label>
-                            <input type="text" id="ws-ticker" placeholder="e.g. AAPL" required>
+            <div style="margin-bottom: 24px; display: flex; flex-direction: column; gap: 20px;">
+                <div class="glass-card" style="padding: 24px;">
+                    <form id="watchlist-form">
+                        <div style="display: grid; grid-template-columns: 1fr 100px 200px; gap: 16px; margin-bottom: 16px;">
+                            <div>
+                                <label>Stock Ticker</label>
+                                <input type="text" id="ws-ticker" placeholder="e.g. AAPL" required>
+                            </div>
+                            <div>
+                                <label>Potential</label>
+                                <input type="number" id="ws-rating" min="1" max="10" value="5" required>
+                            </div>
+                            <div>
+                                <label>Target Folder</label>
+                                <select id="ws-folder"></select>
+                            </div>
                         </div>
-                        <div style="width: 100px;">
-                            <label>Potential</label>
-                            <input type="number" id="ws-rating" min="1" max="10" value="5" required>
+                        <div style="margin-bottom: 16px;">
+                            <label>Personalized Notes</label>
+                            <textarea id="ws-notes" placeholder="Initial thesis or specific catalysts..."></textarea>
                         </div>
-                        <div style="width: 150px;">
-                            <label>Target Folder</label>
-                            <select id="ws-folder"></select>
-                        </div>
-                        <button type="submit" class="btn" style="width: auto;">Add Intel</button>
+                        <button type="submit" class="btn" style="width: auto; float: right;">Capture Stock Intel</button>
+                        <div style="clear: both;"></div>
                     </form>
                 </div>
             </div>
@@ -402,6 +460,37 @@
     </main>
 
     <!-- Modals -->
+    <div id="research-modal" class="modal-overlay" onclick="closeModal('research-modal')">
+        <div class="modal" onclick="event.stopPropagation()">
+            <h2 style="font-weight: 800; margin-bottom: 24px;">Log Research Entry</h2>
+            <form id="research-form">
+                <input type="hidden" id="r-ticker">
+                <div style="margin-bottom: 20px;">
+                    <label>Researcher Name</label>
+                    <input type="text" id="r-name" placeholder="John Doe" required>
+                </div>
+                <div class="form-row">
+                    <div>
+                        <label>Sentiment Rating</label>
+                        <select id="r-rating">
+                            <option value="green">Green (Bullish)</option>
+                            <option value="yellow">Yellow (Neutral)</option>
+                            <option value="red">Red (Bearish)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Research Date</label>
+                        <input type="date" id="r-date" required>
+                    </div>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label>Detailed Notes</label>
+                    <textarea id="r-notes" placeholder="Key takeaways from this session..."></textarea>
+                </div>
+                <button type="submit" class="btn">Add Research to Intelligence</button>
+            </form>
+        </div>
+    </div>
     <div id="trade-modal" class="modal-overlay" onclick="closeModal('trade-modal')">
         <div class="modal" onclick="event.stopPropagation()">
             <h2 style="font-weight: 800; margin-bottom: 24px;">Log New Transaction</h2>
@@ -453,6 +542,7 @@
         // --- CORE APP LOGIC ---
         window.onload = () => {
             document.getElementById('t-date').value = new Date().toISOString().slice(0, 16);
+            document.getElementById('r-date').value = new Date().toISOString().split('T')[0];
             refreshUI();
         };
 
@@ -558,15 +648,53 @@
             // Render Stocks
             const filtered = activeFolder === 'all' ? watchlist : watchlist.filter(w => w.folderId === activeFolder);
             grid.innerHTML = filtered.map((w, idx) => `
-                <div class="glass-card" style="display: flex; justify-content: space-between; align-items: flex-start;">
-                    <div>
-                        <h3 style="font-weight: 800; font-size: 20px;">${w.ticker}</h3>
-                        <p style="font-size: 11px; color: var(--text-s); margin-top: 4px;">FOLDER: ${folders.find(f => f.id === w.folderId)?.name}</p>
-                        <button class="btn-outline" style="margin-top: 16px; border-color: var(--danger); font-size: 11px; padding: 4px 10px;" onclick="removeWatchlist('${w.ticker}')">Drop Intel</button>
+                <div class="glass-card" style="display: flex; flex-direction: column; gap: 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div>
+                            <h3 style="font-weight: 800; font-size: 24px; letter-spacing: -0.5px;">${w.ticker}</h3>
+                            <p style="font-size: 11px; color: var(--text-s); margin-top: 4px;">GROUP: ${folders.find(f => f.id === w.folderId)?.name}</p>
+                        </div>
+                        <div class="potential-badge ${w.rating >= 9 ? 'high' : ''}">${w.rating}</div>
                     </div>
-                    <div class="potential-badge ${w.rating >= 9 ? 'high' : ''}">${w.rating}</div>
+                    
+                    ${w.notes ? `<div style="font-size: 13px; color: var(--text-s); line-height: 1.6; background: rgba(255,255,255,0.02); padding: 12px; border-radius: 12px; border: 1px solid var(--border);">${w.notes}</div>` : ''}
+
+                    <div class="research-section">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                            <h4 style="font-size: 11px; font-weight: 800; color: var(--text-s); text-transform: uppercase;">Research Intelligence</h4>
+                            <button class="btn-outline" style="font-size: 10px; padding: 4px 8px;" onclick="openResearchModal('${w.ticker}')">+ Entry</button>
+                        </div>
+                        <div class="research-list">
+                            ${(w.research || []).length ? w.research.map((r, rIdx) => `
+                                <div class="research-entry">
+                                    <div style="font-weight: 600; color: white;">${r.notes || 'No specific notes recorded'}</div>
+                                    <div class="research-meta">
+                                        <span><span class="rating-dot rating-${r.rating}"></span>${r.name}</span>
+                                        <span>${new Date(r.date).toLocaleDateString()}</span>
+                                    </div>
+                                    <span class="delete-btn" style="position: absolute; top: 8px; right: 8px; font-size: 14px;" onclick="deleteResearch('${w.ticker}', ${rIdx})">×</span>
+                                </div>
+                            `).join('') : '<p style="font-size: 12px; color: var(--text-s); opacity: 0.5; text-align: center; padding: 10px;">No research logged yet.</p>'}
+                        </div>
+                    </div>
+
+                    <button class="btn-outline" style="background: rgba(239, 68, 68, 0.05); color: var(--danger); border-color: rgba(239, 68, 68, 0.2); width: 100%; transition: 0.2s;" onclick="removeWatchlist('${w.ticker}')">Archive Intel Data</button>
                 </div>
             `).join('');
+        }
+
+        function openResearchModal(ticker) {
+            document.getElementById('r-ticker').value = ticker;
+            openModal('research-modal');
+        }
+
+        function deleteResearch(ticker, rIdx) {
+            const stock = watchlist.find(w => w.ticker === ticker);
+            if(stock) {
+                stock.research.splice(rIdx, 1);
+                showToast('RESEARCH ENTRY REMOVED');
+                refreshUI();
+            }
         }
 
         function filterByFolder(id) {
@@ -625,12 +753,39 @@
             watchlist.push({
                 ticker: ticker,
                 rating: document.getElementById('ws-rating').value,
-                folderId: document.getElementById('ws-folder').value
+                folderId: document.getElementById('ws-folder').value,
+                notes: document.getElementById('ws-notes').value,
+                research: []
             });
             
             showToast('INTEL CAPTURED');
             refreshUI();
             e.target.reset();
+        };
+
+        document.getElementById('research-form').onsubmit = (e) => {
+            e.preventDefault();
+            const ticker = document.getElementById('r-ticker').value;
+            const stock = watchlist.find(w => w.ticker === ticker);
+            
+            if(stock) {
+                if(!stock.research) stock.research = [];
+                stock.research.push({
+                    name: document.getElementById('r-name').value,
+                    rating: document.getElementById('r-rating').value,
+                    date: document.getElementById('r-date').value,
+                    notes: document.getElementById('r-notes').value
+                });
+                
+                showToast('RESEARCH ADDED TO ' + ticker);
+                refreshUI();
+                e.target.reset();
+                // We keep the modal open if they want to continuously add?
+                // Actually user said "can continuously press that button to add more" 
+                // but usually modals close on success. Let's keep it open or clear form.
+                // Resetting form is enough.
+                document.getElementById('r-date').value = new Date().toISOString().split('T')[0];
+            }
         };
 
         document.getElementById('folder-form').onsubmit = (e) => {
