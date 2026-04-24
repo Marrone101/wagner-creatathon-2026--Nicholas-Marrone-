@@ -1,6 +1,6 @@
 {
-  "name": "Marrone’s Trades",
-  "description": "A professional-grade stock earnings dashboard and trade intelligence tool built for data-driven insights.",
+  "name": "Marrone’s Ledger",
+  "description": "A professional-grade trade journal and P&L tracker for logging transactions and analyzing portfolio performance.",
   "requestFramePermissions": [],
   "majorCapabilities": []
 }
